@@ -72,10 +72,30 @@ def fit_stroop_model(data, n_trials):
 
 def fit_pd_model(data, n_trials):
     """Fits the Process Dissociation + Guessing MPT model and returns the trace."""
-    pass
+    
+    with pm.Model() as model:
+        # Process Dissociation parameters (i.e. what processing models contributed to the response)
+        A = pm.Uniform("A", 0, 1) # probability of automatic processing
+        C = pm.Uniform("C", 0, 1) # probability of controlled processing
+        B = pm.Beta("B", 3, 3) # probability of guessing "tool" when guessing occurs
 
+        # compute response probabilities based on processing models
+        theta_wt = A + (1-A)*C + (1-A)*(1-C)*B # white face + tool
+        theta_bt = (1-A)*C + (1-A)*(1-C)*B # black face + tool
+        theta_wg = (1-A)*C + (1-A)*(1-C)*(1-B) # white face + gun   
+        theta_bg = A + (1-A)*C + (1-A)*(1-C)*(1-B) # black face + gun
 
-# Saturated MPT Model
+        # Liklihood of each response based on binomial distribution
+        pm.Binomial("white_tool", n=n_trials, p=theta_wt, observed=data["white_tool"])
+        pm.Binomial("black_tool", n=n_trials, p=theta_bt, observed=data["black_tool"])
+        pm.Binomial("white_gun", n=n_trials, p=theta_wg, observed=data["white_gun"])
+        pm.Binomial("black_gun", n=n_trials, p=theta_bg, observed=data["black_gun"])
+
+        # Collect samples from the model
+        trace = pm.sample(1000, tune=1000, target_accept=0.9, idata_kwargs={"log_likelihood": True})
+
+    return trace
+
 #   Parameters:
 #     theta_wt: white tool correct response
 #     theta_bt: black tool correct response
